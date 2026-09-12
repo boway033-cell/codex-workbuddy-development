@@ -1,6 +1,6 @@
 interface:
   display_name: "Codex–WorkBuddy 开发监工"
-  short_description: "从需求引导、WorkBuddy 开发到 Codex 验收与完整版本发布"
-  default_prompt: "Use $codex-workbuddy-development to guide my next step, prepare WorkBuddy's task, synchronize the accepted branch with main, and close out a verified GitHub release."
+  short_description: "需求引导、WorkBuddy 长任务监工、Codex 验收与版本发布"
+  default_prompt: "Use $codex-workbuddy-development to shape the requirement, prepare and monitor WorkBuddy's task, then supervise the verified Git delivery."
 policy:
   allow_implicit_invocation: true

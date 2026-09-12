@@ -1,6 +1,6 @@
 ---
 name: codex-workbuddy-development
-description: Coordinate a local product-development chain in which Codex first analyzes or clarifies the user's requirement and writes an implementation prompt for WorkBuddy, WorkBuddy performs the main implementation, and Codex then acts as final supervisor, independently auditing, testing, closing in-scope defects, and handling approved Git commits and pushes. Apply when the user mentions WorkBuddy development, asks Codex to prepare a WorkBuddy task, supervise or finish WorkBuddy changes, requests final acceptance and delivery, or wants this Codex–WorkBuddy division of labor. Do not activate for ordinary coding without this handoff, conceptual Git teaching, or read-only questions.
+description: Coordinate a local product-development chain in which Codex clarifies the requirement, prepares a WorkBuddy prompt, optionally monitors explicitly requested long-running WorkBuddy development for stalls or model/rate-limit failures, and then independently audits, tests, closes in-scope defects, and handles approved Git delivery. Apply when the user asks Codex to prepare, monitor, supervise, finish, or deliver WorkBuddy development, or wants this Codex–WorkBuddy division of labor. Do not activate for ordinary coding without this handoff, conceptual Git teaching, or unrelated read-only questions.
 ---
 
 # Codex–WorkBuddy Development
@@ -16,6 +16,7 @@ Activate this skill when any of the following is true:
 - The user says a feature or repair will be, is being, or was implemented with WorkBuddy and asks Codex to supervise, inspect, accept, finish, or deliver it.
 - The user presents a product idea or rough requirement and asks Codex to analyze it, clarify it, or turn it into a prompt for WorkBuddy.
 - The user asks Codex to perform “监工”, “验收”, “收口”, “复核”, “最终检查”, “提交”, or “推送” for WorkBuddy output.
+- The user asks Codex to monitor, watch, babysit, keep an eye on, or periodically check a long-running WorkBuddy task.
 - The repository contains relevant `.workbuddy` handoff, memory, report, screenshot, smoke-test, defect, or backup artifacts and the user asks to continue that development batch.
 - The user asks for a repeatable development chain that explicitly divides work between WorkBuddy and Codex.
 - WorkBuddy has left uncommitted changes, including changes directly on `main`, and Codex is asked to make them safe and deliver them.
@@ -97,6 +98,9 @@ Codex kickoff: repository baseline + safe branch
       |
       v
 WorkBuddy: implementation + tests + local evidence + handoff
+      ^
+      | every 10 minutes when explicitly monitored
+      +---- Codex heartbeat: progress / stall / rate limit / model failure
       |
       v
 Codex supervision: diff audit + independent tests + product checks
@@ -231,6 +235,75 @@ A useful WorkBuddy handoff should identify:
 - temporary files, backups, logs, generated output, and local-only artifacts that must not be committed.
 
 Prefer a concise existing project handoff location over creating duplicate reports. `.workbuddy` artifacts are local working evidence by default. Do not commit `.workbuddy/backups`, memory, logs, screenshots, caches, or generated test output unless the repository explicitly treats a particular artifact as versioned source.
+
+## Long-Task Monitoring Mode
+
+Use this mode only when the user explicitly asks Codex to monitor, wait for, babysit, or periodically check a long-running WorkBuddy development task. A task merely being large does not authorize creation of a recurring monitor.
+
+### Start a 10-minute heartbeat
+
+When the Codex environment supports recurring thread heartbeats, create one attached to the current task with a 10-minute interval. The saved monitor prompt must identify:
+
+- the WorkBuddy task or development batch being watched;
+- the repository and expected branch or working directory;
+- the observable progress sources available;
+- the last known progress baseline and expected completion signal;
+- the failure conditions below;
+- the instruction to remain quiet while progress is healthy and unchanged;
+- the instruction to notify only on a meaningful stall, error, completion, or required user action.
+
+Do not claim monitoring is active until the heartbeat is actually created. If recurring heartbeats are unavailable, say so and offer a manual status check; do not simulate background monitoring with a blocking sleep loop.
+
+### Establish observable evidence
+
+Monitor only evidence Codex can actually access, such as:
+
+- WorkBuddy task status exposed by an available task/session tool;
+- recent terminal output and process exit state;
+- new or changed source files, diffs, test output, handoff reports, or status artifacts;
+- timestamps and content of agreed `.workbuddy` progress records;
+- explicit rate-limit, quota, authentication, network, context-window, model, tool, or process errors.
+
+If Codex cannot observe WorkBuddy directly, add a lightweight progress contract to the WorkBuddy prompt: periodically update an agreed status artifact with the current phase, last completed action, active blocker, next action, and update time. Keep this artifact local unless the repository intentionally versions it.
+
+Never infer healthy progress merely because a process exists, and never infer failure merely because there is no new commit. WorkBuddy may be reasoning, testing, or waiting on a slow command.
+
+### Probe every 10 minutes
+
+At each heartbeat:
+
+1. Read the current task/session state and newest observable output.
+2. Compare it with the prior baseline: phase, file/diff changes, test progress, last meaningful output, and error state.
+3. Classify the task as `progressing`, `waiting normally`, `possibly stalled`, `blocked`, `failed`, or `complete`.
+4. Store the new baseline for the next probe without modifying product code.
+
+Treat these as immediate actionable failures when directly observed:
+
+- WorkBuddy rate-limit or quota exhaustion;
+- model unavailable, model invocation failure, or repeated empty/invalid model responses;
+- authentication, permission, network, tool, or dependency failure that stops progress;
+- task/session unexpectedly stopped, exited, crashed, or requests user input;
+- explicit blocker or completion reported by WorkBuddy.
+
+Treat absence of progress as a stall only when two consecutive 10-minute probes show no meaningful change and there is no known long-running command or normal wait. Use a stricter or looser threshold when the task's expected cadence justifies it, and state the reason.
+
+### Notify actionably, not noisily
+
+Stay quiet when the task is progressing or waiting normally. On an actionable event, notify the developer with:
+
+- classification and detection time;
+- concrete evidence, including the last successful progress point;
+- likely cause, clearly labeled as inference when not explicit;
+- impact on the development chain;
+- one recommended recovery action and who should perform it;
+- a copyable recovery prompt or command when safe;
+- whether the monitor will continue.
+
+Monitoring authorizes observation and notification only. Do not automatically switch models, retry paid requests, restart processes, edit code, discard changes, commit, push, merge, release, or deploy unless separately authorized. A transient error may be observed again at the next heartbeat; repeated retries require an explicit and bounded policy.
+
+### Stop monitoring
+
+Stop or pause the heartbeat when the task completes, the user cancels monitoring, the watched task is replaced, or Codex can no longer observe the target. Send a final notification for completion or terminal failure and state the next development-chain step. Do not leave an orphan recurring monitor running after handoff to final acceptance.
 
 ## Stage 3: Codex Final Supervision
 
@@ -402,6 +475,7 @@ Choose the smallest mode that matches the request:
 - **Requirement shaping:** analyze the idea, resolve consequential ambiguity, and produce an approved requirement brief; stop before implementation.
 - **WorkBuddy prompt:** produce or send a self-contained implementation prompt with scope, constraints, acceptance criteria, verification, and handoff requirements.
 - **Supervision only:** audit WorkBuddy output and report pass or blockers; do not edit, commit, or push.
+- **Long-task monitoring:** when explicitly requested, create a 10-minute heartbeat, quietly track observable WorkBuddy progress, alert on stalls or failures, and stop when the task completes or monitoring is cancelled.
 - **Finalization:** audit, make in-scope corrections, test, and leave a commit-ready branch; no external push unless asked.
 - **Commit and push:** complete finalization, commit exact intended files, and push the feature branch.
 - **Main synchronization:** after branch acceptance, merge current `origin/main` into the feature branch and rerun acceptance without merging the feature branch into `main`.

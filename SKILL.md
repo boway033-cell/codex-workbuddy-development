@@ -1,6 +1,6 @@
 ---
 name: codex-workbuddy-development
-description: Coordinate a local product-development chain in which Codex clarifies the requirement, prepares a WorkBuddy prompt, optionally monitors explicitly requested long-running WorkBuddy development for stalls or model/rate-limit failures, and then independently audits, tests, closes in-scope defects, and handles approved Git delivery. Apply when the user asks Codex to prepare, monitor, supervise, finish, or deliver WorkBuddy development, or wants this Codex–WorkBuddy division of labor. Do not activate for ordinary coding without this handoff, conceptual Git teaching, or unrelated read-only questions.
+description: Coordinate a local product-development chain in which Codex clarifies the requirement, prepares a WorkBuddy prompt, optionally monitors explicitly requested long-running WorkBuddy development for stalls or model/rate-limit failures, independently audits and tests the result, routes user-visible changes through a safe local-product trial, closes in-scope defects, and handles approved Git delivery. Apply when the user asks Codex to prepare, monitor, supervise, finish, or deliver WorkBuddy development, or wants this Codex–WorkBuddy division of labor. Do not activate for ordinary coding without this handoff, conceptual Git teaching, or unrelated read-only questions.
 ---
 
 # Codex–WorkBuddy Development
@@ -52,7 +52,7 @@ Prefer one recommended path. Present alternatives only when the choice materiall
 
 ### User: product owner
 
-The user sets requirements, priority, acceptance expectations, and authorization for external delivery. Escalate choices that materially alter scope, behavior, privacy, cost, or data compatibility.
+The user sets requirements, priority, acceptance expectations, hands-on acceptance of user-visible behavior in the local product, and authorization for external delivery. Escalate choices that materially alter scope, behavior, privacy, cost, or data compatibility.
 
 ### WorkBuddy: primary implementer
 
@@ -61,6 +61,7 @@ WorkBuddy normally:
 - explores the product area and implements the requested feature or fix;
 - adds or updates focused tests;
 - performs iterative local debugging and UI smoke checks;
+- leaves a reproducible local-run path for user-visible changes, including commands, ports, configuration assumptions, and safe test-data handling;
 - records useful evidence, remaining defects, and decisions in its handoff artifacts;
 - leaves changes uncommitted for Codex unless the user explicitly chooses otherwise.
 
@@ -108,6 +109,11 @@ Codex supervision: diff audit + independent tests + product checks
       +---- blockers found ---> focused correction ---> re-test
       |
       v
+Local-product trial gate: isolated runnable candidate + user hands-on feedback
+      |
+      +---- feedback found ---> focused correction ---> re-test + repeat trial
+      |
+      v
 Latest-main gate: fetch + merge origin/main into feature branch + re-test
       |
       v
@@ -136,6 +142,7 @@ First establish, from the request and relevant product context:
 - **Constraints:** compatibility, privacy, security, performance, UI consistency, data migration, deployment, and existing conventions;
 - **Acceptance criteria:** concrete scenarios that can pass or fail;
 - **Verification:** tests, build, browser flow, data checks, screenshots, or other evidence Codex will later reproduce;
+- **Local trial:** how a user-visible result will be made safely runnable in the user's local product for hands-on acceptance;
 - **Delivery boundary:** whether this cycle ends at WorkBuddy handoff, Codex acceptance, commit, push, PR, release, or deployment.
 
 Inspect the repository when product or implementation facts are needed. Separate verified facts from assumptions.
@@ -351,6 +358,36 @@ Do not treat “WorkBuddy said tests passed” as equivalent to Codex observing 
 
 When the user asks Codex to finish, deliver, or push, Codex may correct defects clearly required by the original scope, then rerun affected checks. Ask before a redesign, broad refactor, destructive migration, paid operation, production mutation, or behavior change requiring a product decision.
 
+## Stage 3.5: Local Product Trial Gate
+
+For user-visible features and interaction changes, technical verification is necessary but not sufficient. Before final acceptance or Git delivery, make the result available in the user's local product and let the user exercise it personally.
+
+Codex must first complete a technical preflight:
+
+- inspect the final diff and confirm scope;
+- rerun relevant automated tests and the production build;
+- check startup, configuration, data, privacy, and port safety;
+- resolve known blocking defects before asking the user to trial the feature.
+
+Then prepare the local trial safely:
+
+- prefer an isolated worktree, branch, profile, or explicit file overlay over mixing the candidate into an unrelated dirty worktree;
+- preserve the user's existing data and unrelated local changes;
+- distinguish a local-product trial from staging or production deployment;
+- provide a short checklist of representative actions and expected outcomes;
+- record the exact candidate revision, local URL or launch path, and configuration used.
+
+The user trial is an acceptance gate, not a substitute for Codex's independent testing. While waiting for trial feedback, do not commit, push, merge, open a PR, tag, release, or deploy unless the user explicitly waives the gate or separately authorizes that operation.
+
+When feedback identifies a defect:
+
+1. reproduce and classify it;
+2. return it to WorkBuddy or fix it directly when safely in scope;
+3. rerun the technical preflight;
+4. repeat the local trial when behavior changed materially.
+
+The gate may be skipped for documentation-only work, changes with no user-visible behavior, or when the user explicitly waives local trial after being told what will remain unverified.
+
 ## Stage 4: Latest-Main Integration Gate
 
 “Do not merge the feature branch into `main` yet” does not mean “ignore changes arriving on `main`.” A feature branch may pass in isolation while falling behind the current default branch, postponing conflicts and integration failures until the final merge.
@@ -476,6 +513,7 @@ Choose the smallest mode that matches the request:
 - **WorkBuddy prompt:** produce or send a self-contained implementation prompt with scope, constraints, acceptance criteria, verification, and handoff requirements.
 - **Supervision only:** audit WorkBuddy output and report pass or blockers; do not edit, commit, or push.
 - **Long-task monitoring:** when explicitly requested, create a 10-minute heartbeat, quietly track observable WorkBuddy progress, alert on stalls or failures, and stop when the task completes or monitoring is cancelled.
+- **Local product trial preparation:** after automated verification of a user-visible change, prepare an isolated, reproducible local candidate, provide a concise acceptance checklist, collect actual user observations, and pause Git delivery until the trial passes or the user explicitly waives it.
 - **Finalization:** audit, make in-scope corrections, test, and leave a commit-ready branch; no external push unless asked.
 - **Commit and push:** complete finalization, commit exact intended files, and push the feature branch.
 - **Main synchronization:** after branch acceptance, merge current `origin/main` into the feature branch and rerun acceptance without merging the feature branch into `main`.
@@ -490,6 +528,7 @@ Report:
 - the branch used and whether `main` remained untouched;
 - corrections Codex made during finalization;
 - tests, builds, smoke checks, and their observed results;
+- local-product trial status, candidate revision, launch path, and user acceptance or unresolved feedback;
 - committed files, commit identifier, remote branch, and PR/release links when applicable;
 - intentionally excluded local artifacts and unresolved risk;
 - the exact stage reached and the next gate requiring user authorization.
